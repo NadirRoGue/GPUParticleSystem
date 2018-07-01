@@ -1,0 +1,63 @@
+#version 430
+
+layout(std140, binding=4) buffer Pos
+{
+	vec4 Positions [ ];
+};
+
+layout(std140, binding=5) buffer Vel
+{
+	vec4 Velocities [ ];
+};
+
+layout(std140, binding=6) buffer Life
+{
+	vec4 LifeTime [ ];
+};
+
+layout(std140, binding=7) buffer SrcPos
+{
+	vec4 SourcePositions [ ];
+};
+
+layout(local_size_x=256, local_size_y=1, local_size_z=1) in;
+
+uniform vec3 ParticleAcceleration;
+uniform float TimeStep;
+
+uniform vec3 SphereCenter;
+uniform float SphereRadius;
+uniform float ParticleLifeTime;
+
+void main()
+{
+	uint gid = gl_GlobalInvocationID.x;
+
+	float currentLife = LifeTime[gid].x;
+	currentLife += TimeStep;
+
+	if(currentLife >= ParticleLifeTime)
+	{
+		LifeTime[gid].x = 0.0;
+		Positions[gid] = SourcePositions[gid];
+		Velocities[gid] = vec4(0.0, 2.0, 0.0, 0.0);
+	}
+	else
+	{
+		vec3 p = Positions[gid].xyz;
+		vec3 v = Velocities[gid].xyz;
+
+		vec3 newVel = v + ParticleAcceleration*TimeStep;
+		vec3 newPos = p + newVel*TimeStep + 0.5*ParticleAcceleration*TimeStep*TimeStep;
+
+		bool collision = length(newPos - SphereCenter) <= SphereRadius;
+		if(collision)
+		{
+			newPos += normalize(p - SphereCenter) * 0.3;
+		}
+
+		LifeTime[gid].x = currentLife;
+		Positions[gid].xyz = newPos;
+		Velocities[gid].xyz = newVel;
+	}
+}

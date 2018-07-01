@@ -1,0 +1,76 @@
+#version 430
+
+layout(std140, binding=4) buffer Pos
+{
+	vec4 Positions [ ];
+};
+
+layout(std140, binding=5) buffer Vel
+{
+	vec4 Velocities [ ];
+};
+
+layout(std140, binding=6) buffer Life
+{
+	vec4 LifeTime [ ];
+};
+
+layout(std140, binding=7) buffer SrcPos
+{
+	vec4 SourcePos [ ];
+};
+
+layout(local_size_x=256, local_size_y=1, local_size_z=1) in;
+
+uniform int CurrentPowerStep;
+uniform int CurrentStrideStep;
+
+uniform vec3 CameraPosition;
+
+void main()
+{
+	uint gid = gl_GlobalInvocationID.x;
+
+	// Determines which array position we should compare the position
+	// denoted by gid
+	int logStep = 1 << (CurrentPowerStep - CurrentStrideStep);
+
+	if((gid & logStep) == 0)
+	{
+
+		uint partner = gid | logStep;
+
+		bool up = ((gid >> CurrentPowerStep) & 2) == 0; //false;
+
+		vec3 src = Positions[gid].xyz;
+		vec3 dest = Positions[partner].xyz;
+
+		vec3 srcDist = src - CameraPosition;
+		float srcSquaredDist = length(srcDist);//dot(srcDist, srcDist);
+
+		vec3 dstDist = dest - CameraPosition;
+		float destSquaredDist = length(dstDist);//dot(dstDist, dstDist);
+
+		if(srcSquaredDist < destSquaredDist == up)
+		{
+			// Sort positions
+			vec4 tempPos = Positions[gid];
+			Positions[gid] = Positions[partner];
+			Positions[partner] = tempPos;
+
+			// Sort velocities
+			vec4 tempVel = Velocities[gid];
+			Velocities[gid] = Velocities[partner];
+			Velocities[partner] = tempVel;
+
+			// Sort lifetimes
+			vec4 tempLifeTime = LifeTime[gid];
+			LifeTime[gid] = LifeTime[partner];
+			LifeTime[partner] = tempLifeTime;
+
+			vec4 tempSrc = SourcePos[gid];
+			SourcePos[gid] = SourcePos[partner];
+			SourcePos[partner] = tempSrc;
+		}
+	}
+}
